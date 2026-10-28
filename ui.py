@@ -1,4 +1,6 @@
 import html
+from urllib.parse import quote
+from i18n import language, return_path, translate_html
 
 def esc(value): return html.escape(str(value), quote=True)
 STYLE = '''
@@ -9,4 +11,5 @@ STYLE = '''
 '''
 def page(content,title='News',user=None,csrf=''):
     account = f'<span class="meta">{esc(user["email"])}</span><form class="logout" action="/logout" method="post"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Abmelden</button></form>' if user else '<a href="/login">Anmelden</a><a class="button" href="/register">Konto erstellen</a>'
-    return f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="/theme.js"></script><title>{esc(title)} · AG News</title><style>{STYLE}</style></head><body><header><div class="bar"><a class="brand" href="/"><b>AG</b>News</a><nav><a href="/">Übersicht</a><a href="/rss.xml">RSS ↗</a>{account}<button id="theme-toggle" class="theme-toggle" type="button" aria-label="Dunklen Modus aktivieren" aria-pressed="false" hidden>☾ Dunkel</button></nav></div></header><main>{content}</main><footer>AG News · Dein Überblick über IT & Sicherheit<br>Automatischer Quellenüberblick. Meldungen anhand der Originalquelle prüfen. Impressum und Datenschutz vor öffentlicher Freischaltung ergänzen.</footer></body></html>'
+    switch = f'<a class="theme-toggle" href="/language?lang={"en" if language.get()=="de" else "de"}&amp;next={quote(return_path.get(), safe="")}" aria-label="{"Switch to English" if language.get()=="de" else "Auf Deutsch wechseln"}">{"EN" if language.get()=="de" else "DE"}</a>'
+    return translate_html(f'<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="/theme.js"></script><title>{esc(title)} · AG News</title><style>{STYLE}</style></head><body><header><div class="bar"><a class="brand" href="/"><b>AG</b>News</a><nav><a href="/">Übersicht</a><a href="/rss.xml">RSS ↗</a>{account}{switch}<button id="theme-toggle" class="theme-toggle" type="button" aria-label="Dunklen Modus aktivieren" aria-pressed="false" hidden>☾ Dunkel</button></nav></div></header><main>{content}</main><footer>AG News · Dein Überblick über IT & Sicherheit<br>Automatischer Quellenüberblick. Meldungen anhand der Originalquelle prüfen. Impressum und Datenschutz vor öffentlicher Freischaltung ergänzen.</footer></body></html>')

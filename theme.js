@@ -9,9 +9,10 @@
     root.dataset.theme = dark ? 'dark' : 'light';
     const button = document.getElementById('theme-toggle');
     if (button) {
-      button.textContent = dark ? '☀ Hell' : '☾ Dunkel';
+      const english = root.lang === 'en';
+      button.textContent = dark ? (english ? '☀ Light' : '☀ Hell') : (english ? '☾ Dark' : '☾ Dunkel');
       button.setAttribute('aria-pressed', String(dark));
-      button.setAttribute('aria-label', dark ? 'Hellen Modus aktivieren' : 'Dunklen Modus aktivieren');
+      button.setAttribute('aria-label', english ? (dark ? 'Enable light mode' : 'Enable dark mode') : (dark ? 'Hellen Modus aktivieren' : 'Dunklen Modus aktivieren'));
     }
   };
   apply();

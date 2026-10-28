@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from ui import page, esc
+from i18n import language
 
 COOKIE='ag_session'
 def digest(s): return hashlib.sha256(s.encode()).hexdigest()
@@ -51,6 +52,9 @@ def install(app,engine):
         msg=EmailMessage();msg['From']=sender;msg['To']=email
         msg['Subject']='AG News: '+('E-Mail bestätigen' if purpose=='verify' else 'Passwort zurücksetzen')
         msg.set_content(f'Öffne diesen Link, um deine Anfrage abzuschließen:\n{base}/{purpose}?token={token}\n\nDer Link ist einmalig und '+('60' if purpose=='verify' else '30')+' Minuten gültig. Falls du dies nicht angefordert hast, ignoriere diese Nachricht.')
+        if language.get()=='en':
+            msg.replace_header('Subject','AG News: '+('Verify your email' if purpose=='verify' else 'Reset your password'))
+            msg.set_content(f'Open this link to complete your request:\n{base}/{purpose}?token={token}\n\nThis one-time link expires in '+('60' if purpose=='verify' else '30')+' minutes. If you did not request this, ignore this message.')
         port=int(os.getenv('SMTP_PORT','587'))
         with smtplib.SMTP(host,port,timeout=15) as smtp:
             smtp.starttls(context=ssl.create_default_context())

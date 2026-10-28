@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from email.utils import parsedate_to_datetime
 import feedparser, httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response, FileResponse
+from fastapi.responses import HTMLResponse, Response, FileResponse, RedirectResponse
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 
@@ -92,10 +92,30 @@ def theme_script():
 
 from auth import install
 install(app, engine)
+from i18n import language, return_path
+from translations import install as install_translations, localize
+install_translations(engine)
+
+@app.get("/language")
+def choose_language(lang:str="de",next:str="/"):
+    if lang not in ("de","en"): raise HTTPException(400)
+    if not next.startswith("/") or next.startswith("//") or "\\" in next or any(ord(c)<32 for c in next): next="/"
+    response=RedirectResponse(next,303)
+    response.set_cookie("ag_language",lang,max_age=31536000,samesite="lax",httponly=True)
+    return response
+
 
 @app.middleware("http")
 async def security_headers(request, call_next):
-    response = await call_next(request)
+    selected=request.cookies.get("ag_language","de")
+    locale_token=language.set(selected if selected in ("de","en") else "de")
+    path_token=return_path.set(str(request.url.path)+("?"+request.url.query if request.url.query else ""))
+    try:
+        response = await call_next(request)
+    finally:
+        language.reset(locale_token)
+        return_path.reset(path_token)
+    response.headers["Content-Language"]=selected if selected in ("de","en") else "de"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
@@ -123,9 +143,10 @@ def index(request:Request,q:str="",source:str="",category:str=""):
         rows=c.execute(text('SELECT * FROM news'+(' WHERE '+' AND '.join(clauses) if clauses else '')+' ORDER BY published DESC LIMIT 100'),params).mappings().all()
         sources=sorted({r[0] for r in c.execute(text('SELECT DISTINCT source FROM news'))}|{f[0] for f in FEEDS}|{'CISA KEV'})
         categories=sorted({r[0] for r in c.execute(text('SELECT DISTINCT category FROM news'))}|{f[2] for f in FEEDS}|{'Aktiv ausgenutzt'})
+    rows=localize(rows,engine)
     def options(values,selected):
         return ''.join(f'<option value="{esc(v)}" {"selected" if v==selected else ""}>{esc(v)}</option>' for v in values)
-    cards=''.join(f'<article><span class="tag">{esc(r["category"])}</span><h2><a href="/article/{esc(r["id"])}">{esc(r["title"])}</a></h2><p>{esc(r["summary"][:250])}</p><div class="cardfoot"><strong class="meta">{esc(r["source"])}</strong><span class="meta">{date_label(r["published"])}</span></div></article>' for r in rows)
+    cards=''.join(f'<article><span class="tag">{esc(r["category"])}</span><h2><a href="/article/{esc(r["id"])}">{esc(r["title"])}</a></h2><p>{esc(r["summary"][:250])}</p><small>{esc(r["translation_note"])}</small><div class="cardfoot"><strong class="meta">{esc(r["source"])}</strong><span class="meta">{date_label(r["published"])}</span></div></article>' for r in rows)
     if not cards: cards='<div class="empty"><h2>Keine Meldungen gefunden</h2><p>Ändere deine Filter oder schaue später wieder vorbei.</p><a href="/">Alle Meldungen anzeigen →</a></div>'
     return page(f'''<span class="eyebrow">IT & Sicherheit · Der Quellenüberblick</span><h1>Wissen, was die IT bewegt.</h1><p class="intro">Aktuelle Sicherheitswarnungen, Updates und Infrastruktur-News. An einem Ort, direkt aus den Quellen.</p><form class="filters" method="get"><label>Suche<input name="q" placeholder="Thema, Produkt oder CVE suchen …" value="{esc(q)}"></label><label>Quelle<select name="source"><option value="">Alle Quellen</option>{options(sources,source)}</select></label><label>Thema<select name="category"><option value="">Alle Themen</option>{options(categories,category)}</select></label><button>Filtern</button></form><div class="results"><strong>{len(rows)} Meldungen{ ' · maximal 100' if len(rows)==100 else ''}</strong><a href="/">Filter zurücksetzen</a></div><div class="cards">{cards}</div>''',request=request)
 
@@ -134,7 +155,8 @@ def article(uid:str,request:Request):
     if not re.fullmatch('[a-f0-9]{64}',uid): raise HTTPException(404)
     with engine.connect() as c: r=c.execute(text('SELECT * FROM news WHERE id=:id'),{'id':uid}).mappings().first()
     if not r: raise HTTPException(404)
-    return page(f'''<div class="reading"><p><a href="/">← Zur Übersicht</a></p><article><span class="tag">{esc(r['category'])}</span><h1>{esc(r['title'])}</h1><div class="meta">{esc(r['source'])} · {date_label(r['published'])}</div><p>{esc(r['summary'])}</p><p><a class="button" href="{esc(r['url'])}" rel="noopener noreferrer" target="_blank">Originalquelle lesen ↗</a></p><small>Automatischer Quellenüberblick. Nicht unabhängig redaktionell bestätigt.</small></article></div>''',r['title'],request)
+    r=localize([r],engine)[0]
+    return page(f'''<div class="reading"><p><a href="/">← Zur Übersicht</a></p><article><span class="tag">{esc(r['category'])}</span><h1>{esc(r['title'])}</h1><div class="meta">{esc(r['source'])} · {date_label(r['published'])}</div><p>{esc(r['summary'])}</p><small>{esc(r['translation_note'])}</small><p><a class="button" href="{esc(r['url'])}" rel="noopener noreferrer" target="_blank">Originalquelle lesen ↗</a></p><small>Automatischer Quellenüberblick. Nicht unabhängig redaktionell bestätigt.</small></article></div>''',r['title'],request)
 
 @app.get("/health")
 def health():return {"ok":True}

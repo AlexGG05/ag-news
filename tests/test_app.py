@@ -44,4 +44,33 @@ class Workflow(unittest.TestCase):
             with app.engine.begin() as db: db.execute(text('UPDATE auth_tokens SET expires=0'))
             self.assertIn('ungültig',submit('/reset',token=expired,password='another-password-123').text)
 
+
+class Languages(unittest.TestCase):
+    def test_switch_and_translation_cache(self):
+        with patch.object(app,'loop'), TestClient(app.app,base_url='https://testserver') as c:
+            r=c.get('/language?lang=en&next=/',follow_redirects=True)
+            self.assertIn('<html lang="en">',r.text)
+            self.assertIn('Stay ahead of what moves IT.',r.text)
+            self.assertIn('Create account',c.get('/register').text)
+            self.assertIn('Verify email',c.get('/verify').text)
+            self.assertEqual(c.get('/language?lang=fr').status_code,400)
+            self.assertEqual(c.get('/language?lang=en&next=//evil.example',follow_redirects=False).headers['location'],'/')
+            self.assertEqual(c.get('/theme.js').status_code,200)
+            c.get('/language?lang=de')
+            self.assertIn('Wissen, was die IT bewegt.',c.get('/').text)
+        from translations import localize
+        from i18n import language
+        marker=language.set('de')
+        try:
+            with patch.dict(os.environ,TRANSLATE_URL='http://translator:5000'),patch('translations.httpx.post') as post:
+                post.return_value.json.return_value={'translatedText':['Deutscher Titel','Deutsche Zusammenfassung']}
+                rows=[{'title':'Unique English headline','summary':'Unique English summary'}]
+                translated=localize(rows,app.engine)
+                self.assertEqual(translated[0]['title'],'Deutscher Titel')
+                self.assertEqual(localize(rows,app.engine)[0]['summary'],'Deutsche Zusammenfassung')
+                self.assertEqual(post.call_count,1)
+                post.side_effect=__import__('httpx').ConnectError('offline')
+                self.assertIn('nicht verfügbar',localize([{'title':'uncached','summary':''}],app.engine)[0]['translation_note'])
+        finally:language.reset(marker)
+
 if __name__=='__main__': unittest.main()

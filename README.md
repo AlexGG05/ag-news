@@ -23,9 +23,19 @@ services:
       SMTP_FROM: "${SMTP_FROM:?Absenderadresse setzen}"
       SMTP_USER: "${SMTP_USER:-}"
       SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      TRANSLATE_URL: http://translate:5000
     depends_on:
       db:
         condition: service_healthy
+
+  translate:
+    image: libretranslate/libretranslate:v1.6.5
+    restart: unless-stopped
+    environment:
+      LT_LOAD_ONLY: en,de
+      LT_UPDATE_MODELS: "true"
+    volumes:
+      - ag_news_translation_models:/home/libretranslate/.local
 
   db:
     image: postgres:16-alpine
@@ -45,6 +55,7 @@ services:
 
 volumes:
   ag_news_db:
+  ag_news_translation_models:
 ```
 
 Vor dem Start in Arcane die Stack-Umgebungsvariablen setzen (alternativ bei Docker Compose in einer lokalen `.env` neben der Compose-Datei):
@@ -136,3 +147,27 @@ Integrationstest mit isolierter SQLite-Datenbank und simuliertem SMTP-Versand:
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 ```
+
+
+## Deutsch / English und Dark Mode
+
+Über **EN / DE** im Seitenkopf wechseln Oberfläche und Meldungstexte zwischen Deutsch
+und Englisch. Die Auswahl wird für ein Jahr im Browser gespeichert. Ohne Auswahl
+ist Deutsch voreingestellt. Der Hell-/Dunkel-Umschalter speichert seine Auswahl
+lokal; zunächst gilt das Farbschema des Betriebssystems.
+
+Die Compose-Konfiguration enthält den eigenen Übersetzungsdienst LibreTranslate.
+Er benötigt beim ersten Start Internetzugriff zum Laden der Sprachmodelle und kann
+mehrere Minuten benötigen. Modelle bleiben im separaten Volume gespeichert; die
+fertigen Übersetzungen werden in der AG-News-Datenbank zwischengespeichert.
+Der Dienst hat keinen veröffentlichten Host-Port. Eine kostenpflichtige Übersetzungs-API
+ist nicht erforderlich. `TRANSLATE_URL` muss aus dem App-Container erreichbar sein.
+Bei einem vorhandenen eigenen LibreTranslate-Dienst kann dessen Adresse verwendet
+werden. Ein externer Dienst erhält die zur Übersetzung angefragten Nachrichtentexte.
+
+Automatisch übersetzte Texte sind gekennzeichnet; die Originalquelle bleibt verlinkt.
+Ist die Übersetzung noch nicht verfügbar, zeigt die Anwendung den Originaltext mit
+Hinweis. Die Übersetzungen ändern weder die gespeicherten Originalmeldungen noch
+Quellenfilter und Suchindex: Die Suche arbeitet weiterhin mit den Originaltexten.
+RSS liefert weiterhin die Originalmeldungen. Der erste Seitenaufruf mit neuen Texten
+kann wegen der Übersetzung länger dauern; spätere Aufrufe nutzen den Cache.
