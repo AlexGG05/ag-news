@@ -58,12 +58,12 @@ def loop():
     while True:
         try: poll()
         except Exception: logging.exception("Import fehlgeschlagen")
-        time.sleep(3600)
+        time.sleep(max(300, int(os.environ.get('POLL_INTERVAL_SECONDS', '1800'))))
 @app.on_event("startup")
 def start():
     threading.Thread(target=loop,daemon=True).start()
 def page(content,title="AG News"):
-    return HTMLResponse(f"""<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Aktuelle IT-Sicherheits- und Infrastrukturmeldungen"><title>{html.escape(title)} | AG News</title><style>
+    return HTMLResponse(f"""<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="300"><meta name="description" content="Aktuelle IT-Sicherheits- und Infrastrukturmeldungen"><title>{html.escape(title)} | AG News</title><style>
     *{{box-sizing:border-box}}body{{margin:0;background:#0b1020;color:#eaf0ff;font:16px system-ui,sans-serif;line-height:1.65}}header{{background:#111a30;border-bottom:1px solid #26334d;padding:18px max(20px,calc((100vw - 980px)/2))}}a{{color:#91c6ff}}nav a{{margin-right:18px}}.brand{{font-weight:800;font-size:26px;color:white;text-decoration:none}}main{{max-width:980px;margin:36px auto;padding:0 20px}}.cards{{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}}article{{background:#151f35;border:1px solid #293752;border-radius:14px;padding:20px}}article h2{{line-height:1.25;margin:8px 0}}article h2 a{{color:white;text-decoration:none}}small{{color:#a5b4ce}}.tag{{color:#6ed8bc;font-size:13px;font-weight:bold}}footer{{margin:70px auto 20px;max-width:980px;padding:20px;color:#a5b4ce;border-top:1px solid #293752}}input{{background:#1c2940;border:1px solid #40516a;color:white;padding:12px;border-radius:10px;width:min(100%,460px)}}</style></head><body><header><a class="brand" href="/">AG News</a><nav><a href="/">News</a><a href="/rss.xml">RSS</a></nav></header><main>{content}</main><footer>AG News · Automatisierter Nachrichtenüberblick · Quellen und Veröffentlichungszeiten beachten. <strong>Impressum und Datenschutz vor öffentlicher Freischaltung ergänzen!</strong></footer></body></html>""")
 @app.get("/",response_class=HTMLResponse)
 def index(q:str=""):
@@ -74,7 +74,7 @@ def index(q:str=""):
     cards=""
     for r in rows:
         cards+=f'<article><span class="tag">{html.escape(r["category"])}</span><small> · {html.escape(r["source"])} · {r["published"]:%d.%m.%Y %H:%M} UTC</small><h2><a href="/article/{r["id"]}">{html.escape(r["title"])}</a></h2><p>{html.escape(r["summary"][:280])}</p></article>'
-    return page(f'<h1>Aktuelle IT-Meldungen</h1><p>Offizielle Quellen, automatisiert stündlich geprüft. Noch keine KI-generierten Artikel.</p><form><input name="q" placeholder="Meldungen durchsuchen..." value="{html.escape(q,quote=True)}"></form><p>{len(rows)} Meldungen</p><div class="cards">{cards or "<p>Noch keine Meldungen vorhanden.</p>"}</div>')
+    return page(f'<h1>Aktuelle IT-Meldungen</h1><p>Offizielle Quellen, alle 30 Minuten geprüft. Ohne kostenpflichtige KI-API.</p><form><input name="q" placeholder="Meldungen durchsuchen..." value="{html.escape(q,quote=True)}"></form><p>{len(rows)} Meldungen</p><div class="cards">{cards or "<p>Noch keine Meldungen vorhanden.</p>"}</div>')
 @app.get("/article/{uid}",response_class=HTMLResponse)
 def article(uid:str):
     if not re.fullmatch("[a-f0-9]{64}",uid): raise HTTPException(404)
