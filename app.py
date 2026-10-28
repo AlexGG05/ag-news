@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from email.utils import parsedate_to_datetime
 import feedparser, httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, FileResponse
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 
@@ -83,7 +83,13 @@ def loop():
 @app.on_event("startup")
 def start():
     threading.Thread(target=loop,daemon=True).start()
+from pathlib import Path
 from ui import page as render_page, esc
+
+@app.get("/theme.js", include_in_schema=False)
+def theme_script():
+    return FileResponse(Path(__file__).with_name("theme.js"), media_type="text/javascript")
+
 from auth import install
 install(app, engine)
 
