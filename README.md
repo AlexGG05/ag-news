@@ -17,6 +17,12 @@ services:
     environment:
       TZ: Europe/Berlin
       DATABASE_URL: postgresql+psycopg2://agnews:agnews@db:5432/agnews
+      APP_BASE_URL: "${APP_BASE_URL:?Öffentliche HTTPS-Adresse setzen}"
+      SMTP_HOST: "${SMTP_HOST:?SMTP-Server setzen}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_FROM: "${SMTP_FROM:?Absenderadresse setzen}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
     depends_on:
       db:
         condition: service_healthy
@@ -40,6 +46,23 @@ services:
 volumes:
   ag_news_db:
 ```
+
+Vor dem Start in Arcane die Stack-Umgebungsvariablen setzen (alternativ bei Docker Compose in einer lokalen `.env` neben der Compose-Datei):
+
+```dotenv
+APP_BASE_URL=https://news.deine-domain.de
+SMTP_HOST=smtp.dein-mailanbieter.de
+SMTP_PORT=587
+SMTP_FROM=AG News <news@deine-domain.de>
+SMTP_USER=news@deine-domain.de
+SMTP_PASSWORD=HIER_DAS_SMTP_PASSWORT_EINTRAGEN
+```
+
+Die Werte sind Platzhalter: Domain, SMTP-Server und Absender durch deine echten Daten ersetzen. Das SMTP-Passwort ausschließlich lokal bzw. in Arcane eintragen, niemals ins Repository committen. Bei einem Mailanbieter mit SMTP-Anmeldung müssen `SMTP_USER` und `SMTP_PASSWORD` beide gesetzt sein; bei einem ausdrücklich ohne Anmeldung freigegebenen Relay dürfen beide leer bleiben.
+
+`APP_BASE_URL` muss die von Benutzern erreichbare Website-Adresse sein, ohne abschließenden Schrägstrich. An diese Adresse führen die Bestätigungs- und Passwortlinks. Der SMTP-Server muss STARTTLS unterstützen (üblicherweise Port 587); implizites TLS auf Port 465 wird derzeit nicht unterstützt. Die Absenderadresse muss beim Mailanbieter erlaubt sein. Nach Änderungen den `ag-news`-Container neu erstellen, damit er die neuen Umgebungsvariablen übernimmt. Anschließend ein Testkonto registrieren und den empfangenen Bestätigungslink prüfen.
+
+Ohne eigene Domain ist für einen lokalen Test auch `APP_BASE_URL=http://SERVER-IP:8089` möglich; für den öffentlichen Betrieb die HTTPS-Adresse verwenden.
 
 Danach unter `http://SERVER-IP:8089` öffnen. Für öffentlichen Betrieb HTTPS per Nginx Proxy Manager/Cloudflare konfigurieren. **Vor produktivem Einsatz** das Beispielpasswort in beiden Umgebungsvariablen ändern (identischer neuer Wert; bei bereits initialisierter Datenbank zusätzlich das PostgreSQL-Passwort migrieren).
 
