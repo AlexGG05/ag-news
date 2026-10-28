@@ -16,12 +16,8 @@ with engine.begin() as c:
       id VARCHAR(64) PRIMARY KEY, title TEXT NOT NULL, url TEXT NOT NULL,
       source TEXT NOT NULL, category TEXT NOT NULL, summary TEXT NOT NULL,
       published TIMESTAMP NOT NULL, added TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)"""))
-FEEDS=[
- ("CISA","https://www.cisa.gov/cybersecurity-advisories/all.xml","Sicherheit"),
- ("Microsoft Security","https://msrc.microsoft.com/blog/feed","Microsoft"),
- ("GitHub Security","https://github.blog/security/feed/","Sicherheit"),
- ("Proxmox","https://www.proxmox.com/en/about/company-details/press-releases/rss","Virtualisierung"),
-]
+from sources import FEEDS, KEV_JSON
+
 KEYWORDS=re.compile(r"security|vulnerab|cve-|exploit|patch|ransomware|outage|incident|advisory|update|critical|windows|linux|firmware|schwachstell|sicherheits",re.I)
 app=FastAPI(title="AG News",docs_url=None,redoc_url=None)
 def safe(s,limit=1000):
@@ -37,12 +33,12 @@ def poll():
                 for item in feed.entries[:40]:
                     title=safe(item.get("title"),300)
                     link=item.get("link","")
-                    if not title or not KEYWORDS.search(title) or urlparse(link).scheme!="https":
+                    if not title or urlparse(link).scheme!="https":
                         continue
                     raw=item.get("published") or item.get("updated")
                     try: published=parsedate_to_datetime(raw).astimezone(timezone.utc).replace(tzinfo=None) if raw else datetime.now(timezone.utc).replace(tzinfo=None)
                     except Exception: published=datetime.now(timezone.utc).replace(tzinfo=None)
-                    if abs((datetime.utcnow()-published).total_seconds()) > 7*86400:
+                    if abs((datetime.utcnow()-published).total_seconds()) > 14*86400:
                         continue
                     summary=safe(item.get("summary") or item.get("description"),850)
                     uid=hashlib.sha256(link.encode()).hexdigest()
@@ -53,6 +49,31 @@ def poll():
                         added+=1
                     except IntegrityError: pass
             except Exception: logging.exception("Feed-Fehler: %s",source)
+        try:
+            kev=client.get(KEV_JSON)
+            kev.raise_for_status()
+            data=kev.json()
+            for item in data.get("vulnerabilities",[]):
+                try:
+                    day=item.get("dateAdded","")
+                    if (datetime.now(timezone.utc).date()-datetime.strptime(day,"%Y-%m-%d").date()).days > 14:
+                        continue
+                    cve=item.get("cveID","")
+                    if not re.fullmatch(r"CVE-\\d{4}-\\d{4,}",cve):
+                        continue
+                    title=safe(f"{cve}: {item.get('vendorProject','')} {item.get('product','')} – aktiv ausgenutzt",300)
+                    link="https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+                    summary=safe(f"{item.get('vulnerabilityName','')}. {item.get('shortDescription','')} Maßnahme: {item.get('requiredAction','')}. Frist: {item.get('dueDate','')}.",850)
+                    uid=hashlib.sha256(("kev:"+cve).encode()).hexdigest()
+                    with engine.begin() as c:
+                        c.execute(text("INSERT INTO news (id,title,url,source,category,summary,published) VALUES (:id,:title,:url,:source,:category,:summary,:published)"),dict(id=uid,title=title,url=link,source="CISA KEV",category="Aktiv ausgenutzt",summary=summary,published=datetime.strptime(day,"%Y-%m-%d")))
+                    added+=1
+                except IntegrityError:
+                    pass
+                except Exception:
+                    logging.exception("KEV-Eintrag fehlgeschlagen")
+        except Exception:
+            logging.exception("CISA KEV Import fehlgeschlagen")
     logging.info("News importiert: %d",added)
 def loop():
     while True:
