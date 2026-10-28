@@ -59,7 +59,7 @@ def poll():
                     if (datetime.now(timezone.utc).date()-datetime.strptime(day,"%Y-%m-%d").date()).days > 14:
                         continue
                     cve=item.get("cveID","")
-                    if not re.fullmatch(r"CVE-\\d{4}-\\d{4,}",cve):
+                    if not re.fullmatch(r"CVE-\d{4}-\d{4,}",cve):
                         continue
                     title=safe(f"{cve}: {item.get('vendorProject','')} {item.get('product','')} – aktiv ausgenutzt",300)
                     link="https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
