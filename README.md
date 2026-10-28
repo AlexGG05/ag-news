@@ -43,9 +43,11 @@ volumes:
 
 Danach unter `http://SERVER-IP:8089` öffnen. Für öffentlichen Betrieb HTTPS per Nginx Proxy Manager/Cloudflare konfigurieren. **Vor produktivem Einsatz** das Beispielpasswort in beiden Umgebungsvariablen ändern (identischer neuer Wert; bei bereits initialisierter Datenbank zusätzlich das PostgreSQL-Passwort migrieren).
 
-## Automatische Aktualisierung
+## Automatische Aktualisierung ohne API-Kosten
 
-Der Import läuft **beim Containerstart und danach stündlich**. Der Dienst liest ausgewählte Feeds (CISA, Microsoft Security, GitHub Security, Proxmox), filtert Schlagwörter und speichert Titel, Zusammenfassung, Datum und Quelle. Die Webseite zeigt neue Meldungen sofort beim erneuten Laden; kein Git-Push oder Image-Update pro Nachricht erforderlich. Der Import garantiert nicht, dass alle Feeds erreichbar oder vollständig sind.
+**Kein OpenAI-API-Schlüssel erforderlich.** Die Website sammelt alle 30 Minuten Meldungen aus RSS-Feeds und zeigt Quellenübersichten an. Dies ist noch **keine eigenständig recherchierende KI-Redaktion**: Für lange, selbst formulierte Artikel ohne API-Kosten wäre ein zusätzliches lokales LLM (z. B. Ollama auf ausreichend leistungsfähiger Hardware) erforderlich. Der aktuelle Code erzeugt keine solchen Artikel. Die Seite aktualisiert sich im Browser alle 5 Minuten.
+
+Der Import läuft **beim Containerstart und danach alle 30 Minuten**. Der Dienst liest ausgewählte Feeds (CISA, Microsoft Security, GitHub Security, Proxmox), filtert Schlagwörter und speichert Titel, Zusammenfassung, Datum und Quelle. Die Webseite zeigt neue Meldungen sofort beim erneuten Laden; kein Git-Push oder Image-Update pro Nachricht erforderlich. Der Import garantiert nicht, dass alle Feeds erreichbar oder vollständig sind.
 
 ### Wie kommen ChatGPT-Briefings auf die Website?
 
