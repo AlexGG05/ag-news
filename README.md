@@ -75,3 +75,41 @@ Healthcheck: `/health`; RSS: `/rss.xml`.
 Die Datei `sources.py` enthält 30 RSS-/Atom-Quellen, darunter CERT-Bund WID, BSI, Heise Security, Golem Security, Security-Insider, MSRC, Microsoft 365 Roadmap, Azure, Cisco, Fortinet, Sophos, Proxmox, GitHub Security, Ubuntu, Red Hat und weitere. Zusätzlich importiert `app.py` die offiziellen CISA-KEV-JSON-Daten für die letzten 14 Tage. Der Import akzeptiert jetzt alle Feed-Titel (ohne den alten engen Keywordfilter). Doppelte URLs werden nicht mehrfach gespeichert. **Nicht alle Quellen sind live geprüft; einzelne können 403/404 liefern oder Feed-Änderungen erfordern.** Fehler im Container-Log prüfen: `docker logs ag-news --tail 100`. Bei Golem und anderen Verlagen vor öffentlicher/kommerzieller Nutzung die Feed-Nutzungsbedingungen beachten; Inhalte nicht vollständig übernehmen.
 
 Nach Änderungen am Repository wird ein neues Image gebaut; in Arcane danach Image neu pullen und den Container neu erstellen. Das ist nicht identisch mit dem automatischen Nachrichtenimport.
+
+## Konten und Mailversand
+
+Die Oberfläche bietet Suche sowie kombinierbare Quellen- und Themenfilter. Nachrichten
+bleiben öffentlich lesbar. Konten müssen vor der ersten Anmeldung per E-Mail bestätigt
+werden. Unter `/login`, `/register` und `/forgot` stehen die Kontofunktionen bereit.
+
+Für den Versand per SMTP mit verpflichtendem STARTTLS konfigurieren:
+
+- `APP_BASE_URL`: öffentliche HTTPS-Adresse, zum Beispiel `https://news.example.org`
+- `SMTP_HOST`: SMTP-Server
+- `SMTP_PORT`: STARTTLS-Port (Standard: `587`)
+- `SMTP_FROM`: erlaubte Absenderadresse
+- `SMTP_USER` und `SMTP_PASSWORD`: Zugangsdaten, falls der Server Anmeldung verlangt;
+  das Passwort ausschließlich als Laufzeit-Secret bereitstellen.
+
+Ohne Mailkonfiguration zeigt die Registrierung einen Hinweis; es werden keine
+Bestätigungslinks in Logs ausgegeben. Bestätigungslinks gelten 60 Minuten,
+Passwortlinks 30 Minuten. Beide können nur einmal verwendet werden. Die Bestätigung
+benötigt einen zusätzlichen Klick auf der Zielseite, damit Mail-Linkscanner den Link
+nicht verbrauchen. Bei einem Passwortwechsel werden alle Sitzungen widerrufen.
+Sitzungen gelten sieben Tage. HTTPS in `APP_BASE_URL` aktiviert Secure-Cookies.
+Die vorhandene Datenbank erhält automatisch zusätzliche Tabellen; bestehende
+Meldungen bleiben erhalten. Für dauerhafte Konten die Datenbank persistent speichern.
+
+Entwicklungsstart (Python 3.12):
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+DATABASE_URL=sqlite:////tmp/ag-news.db .venv/bin/uvicorn app:app --port 8080
+```
+
+Integrationstest mit isolierter SQLite-Datenbank und simuliertem SMTP-Versand:
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+```
