@@ -112,8 +112,11 @@ Nach Änderungen am Repository wird ein neues Image gebaut; in Arcane danach Ima
 
 ## Konten und Mailversand
 
-Die Oberfläche bietet Suche sowie kombinierbare Quellen- und Themenfilter. Nachrichten
-bleiben öffentlich lesbar. Konten müssen vor der ersten Anmeldung per E-Mail bestätigt
+Die Oberfläche bietet Suche sowie kombinierbare Quellen- und Themenfilter. Nachrichten (Übersicht, Artikelseiten und RSS) sind nur mit einer gültigen Anmeldung
+lesbar. Ohne Sitzung führt der Aufruf zur Anmeldeseite. RSS-Programme benötigen
+ebenfalls das Sitzungscookie; ein öffentlicher Feed ist nicht verfügbar. Registrierung,
+Anmeldung, Passwortwiederherstellung und Healthcheck bleiben ohne Anmeldung erreichbar.
+Konten müssen vor der ersten Anmeldung per E-Mail bestätigt
 werden. Unter `/login`, `/register` und `/forgot` stehen die Kontofunktionen bereit.
 
 Für den Versand per SMTP mit verpflichtendem STARTTLS konfigurieren:

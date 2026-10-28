@@ -12,6 +12,17 @@ class Workflow(unittest.TestCase):
             def submit(path,**fields):
                 c.get(path)
                 return c.post(path,data={'csrf':c.cookies['ag_csrf'],**fields})
+            protected_paths=['/', '/?q=Linux', '/article/'+'a'*64, '/rss.xml']
+            def assert_locked():
+                for path in protected_paths:
+                    response=c.get(path,follow_redirects=False)
+                    self.assertEqual(response.status_code,303)
+                    self.assertEqual(response.headers['location'],'/login')
+                    self.assertNotIn('Linux warning',response.text)
+            assert_locked()
+            c.cookies.set('ag_session','invalid')
+            assert_locked()
+            c.cookies.clear()
             r=submit('/register',email='test@example.org',password='long-password-123')
             self.assertIn('erhältst du eine E-Mail',r.text)
             mail=smtp.return_value.__enter__.return_value.send_message.call_args[0][0]
@@ -26,6 +37,7 @@ class Workflow(unittest.TestCase):
             token=re.search(r'token=([\w-]+)',mail.get_content()).group(1)
             submit('/reset',token=token,password='new-long-password-456')
             self.assertNotIn('Abmelden',c.get('/').text)
+            assert_locked()
             self.assertIn('ungültig',submit('/reset',token=token,password='new-long-password-456').text)
             self.assertIn('Abmelden',submit('/login',email='test@example.org',password='new-long-password-456').text)
             with app.engine.begin() as db:
@@ -37,6 +49,16 @@ class Workflow(unittest.TestCase):
             self.assertEqual(c.get('/article/'+'a'*64).status_code,200)
             self.assertEqual(c.get('/health').json(),{'ok':True})
             self.assertEqual(c.get('/rss.xml').status_code,200)
+            from auth import digest
+            with app.engine.begin() as db:
+                db.execute(text('UPDATE sessions SET expires=0 WHERE token=:t'),{'t':digest(c.cookies['ag_session'])})
+            assert_locked()
+            submit('/login',email='test@example.org',password='new-long-password-456')
+            with app.engine.connect() as db:
+                csrf=db.execute(text('SELECT csrf FROM sessions WHERE token=:t'),{'t':digest(c.cookies['ag_session'])}).scalar_one()
+            c.post('/logout',data={'csrf':csrf})
+            assert_locked()
+
             self.assertEqual(c.post('/login',data={'email':'test@example.org'}).status_code,403)
             submit('/forgot',email='test@example.org')
             mail=smtp.return_value.__enter__.return_value.send_message.call_args[0][0]
@@ -50,14 +72,14 @@ class Languages(unittest.TestCase):
         with patch.object(app,'loop'), TestClient(app.app,base_url='https://testserver') as c:
             r=c.get('/language?lang=en&next=/',follow_redirects=True)
             self.assertIn('<html lang="en">',r.text)
-            self.assertIn('Stay ahead of what moves IT.',r.text)
+            self.assertIn('Welcome back',r.text)
             self.assertIn('Create account',c.get('/register').text)
             self.assertIn('Verify email',c.get('/verify').text)
             self.assertEqual(c.get('/language?lang=fr').status_code,400)
             self.assertEqual(c.get('/language?lang=en&next=//evil.example',follow_redirects=False).headers['location'],'/')
             self.assertEqual(c.get('/theme.js').status_code,200)
             c.get('/language?lang=de')
-            self.assertIn('Wissen, was die IT bewegt.',c.get('/').text)
+            self.assertIn('Willkommen zurück',c.get('/').text)
         from translations import localize
         from i18n import language
         marker=language.set('de')

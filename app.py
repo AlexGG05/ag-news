@@ -83,6 +83,7 @@ def loop():
 @app.on_event("startup")
 def start():
     threading.Thread(target=loop,daemon=True).start()
+from starlette.concurrency import run_in_threadpool
 from pathlib import Path
 from ui import page as render_page, esc
 
@@ -111,7 +112,11 @@ async def security_headers(request, call_next):
     locale_token=language.set(selected if selected in ("de","en") else "de")
     path_token=return_path.set(str(request.url.path)+("?"+request.url.query if request.url.query else ""))
     try:
-        response = await call_next(request)
+        protected = request.url.path in ("/", "/rss.xml") or request.url.path.startswith("/article/")
+        if protected and not await run_in_threadpool(app.state.current_user, request):
+            response = RedirectResponse("/login", 303)
+        else:
+            response = await call_next(request)
     finally:
         language.reset(locale_token)
         return_path.reset(path_token)
