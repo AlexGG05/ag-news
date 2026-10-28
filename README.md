@@ -47,7 +47,7 @@ Danach unter `http://SERVER-IP:8089` öffnen. Für öffentlichen Betrieb HTTPS p
 
 **Kein OpenAI-API-Schlüssel erforderlich.** Die Website sammelt alle 30 Minuten Meldungen aus RSS-Feeds und zeigt Quellenübersichten an. Dies ist noch **keine eigenständig recherchierende KI-Redaktion**: Für lange, selbst formulierte Artikel ohne API-Kosten wäre ein zusätzliches lokales LLM (z. B. Ollama auf ausreichend leistungsfähiger Hardware) erforderlich. Der aktuelle Code erzeugt keine solchen Artikel. Die Seite aktualisiert sich im Browser alle 5 Minuten.
 
-Der Import läuft **beim Containerstart und danach alle 30 Minuten**. Der Dienst liest ausgewählte Feeds (CISA, Microsoft Security, GitHub Security, Proxmox), filtert Schlagwörter und speichert Titel, Zusammenfassung, Datum und Quelle. Die Webseite zeigt neue Meldungen sofort beim erneuten Laden; kein Git-Push oder Image-Update pro Nachricht erforderlich. Der Import garantiert nicht, dass alle Feeds erreichbar oder vollständig sind.
+Der Import läuft **beim Containerstart und danach alle 30 Minuten**. Der Dienst liest einen erweiterten Katalog von 30 RSS/Atom-Quellen aus Deutschland und internationalen Hersteller-/Securityquellen sowie CISA KEV als JSON, filtert Schlagwörter und speichert Titel, Zusammenfassung, Datum und Quelle. Die Webseite zeigt neue Meldungen sofort beim erneuten Laden; kein Git-Push oder Image-Update pro Nachricht erforderlich. Der Import garantiert nicht, dass alle Feeds erreichbar oder vollständig sind.
 
 ### Wie kommen ChatGPT-Briefings auf die Website?
 
@@ -69,3 +69,9 @@ docker run --rm -p 8089:8080 -e DATABASE_URL=sqlite:////tmp/news.db ag-news
 ```
 
 Healthcheck: `/health`; RSS: `/rss.xml`.
+
+## Quellenkatalog
+
+Die Datei `sources.py` enthält 30 RSS-/Atom-Quellen, darunter CERT-Bund WID, BSI, Heise Security, Golem Security, Security-Insider, MSRC, Microsoft 365 Roadmap, Azure, Cisco, Fortinet, Sophos, Proxmox, GitHub Security, Ubuntu, Red Hat und weitere. Zusätzlich importiert `app.py` die offiziellen CISA-KEV-JSON-Daten für die letzten 14 Tage. Der Import akzeptiert jetzt alle Feed-Titel (ohne den alten engen Keywordfilter). Doppelte URLs werden nicht mehrfach gespeichert. **Nicht alle Quellen sind live geprüft; einzelne können 403/404 liefern oder Feed-Änderungen erfordern.** Fehler im Container-Log prüfen: `docker logs ag-news --tail 100`. Bei Golem und anderen Verlagen vor öffentlicher/kommerzieller Nutzung die Feed-Nutzungsbedingungen beachten; Inhalte nicht vollständig übernehmen.
+
+Nach Änderungen am Repository wird ein neues Image gebaut; in Arcane danach Image neu pullen und den Container neu erstellen. Das ist nicht identisch mit dem automatischen Nachrichtenimport.
